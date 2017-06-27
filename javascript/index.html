@@ -67,10 +67,11 @@
 	 tr.dataset.y = y;
 
 	 for(x=0; x<WIDTH; x++) {
-	   out[y][x]    = Math.random() >= 0.2 ? 0 : 1; // initialise with some random data. comment if you want to do it by hand
-	   td           = document.createElement('td'); // for each x position create a table data cell
-	   td.dataset.y = y;
-	   td.dataset.x = x;
+	   out[y][x]      = Math.random() >= 0.2 ? 0 : 1; // initialise with some random data. comment if you want to do it by hand
+	   td             = document.createElement('td'); // for each x position create a table data cell
+	   td.dataset.y   = y;
+	   td.dataset.x   = x;
+	   td.onmouseover = function() { out[this.dataset.y][this.dataset.x]=1; };
 	   tr.appendChild(td); // add the cell to the row
 	 }
 
