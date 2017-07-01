@@ -34,6 +34,7 @@
   <button onclick="window.clear()">Clear</button>
   <select id="preset" name="preset" onchange="window.refresh()"> <!--Supplement an id here instead of using 'name'-->
     <option value="random" selected>Random</option>
+    <option value="glidergun">Glider gun</option>
     <option value="glidercrash">Glider crash</option>
   </select>
   <script>
@@ -45,6 +46,18 @@
 010${new Array(WIDTH-5).map(i => 0)}010
 001${new Array(WIDTH-5).map(i => 0)}100
 111${new Array(WIDTH-5).map(i => 0)}111
+`,
+    glidergun: `
+00000000000000000000000000000000000000
+00000000000000000000000000100000000000
+00000000000000000000000010100000000000
+00000000000000110000001100000000000011
+00000000000001000100001100000000000011
+00110000000010000010001100000000000000
+00110000000010001011000010100000000000
+00000000000010000010000000100000000000
+00000000000001000100000000000000000000
+00000000000000110000000000000000000000
 `,
       glider: `
 010
