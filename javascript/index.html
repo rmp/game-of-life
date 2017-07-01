@@ -1,150 +1,258 @@
 <html>
-  <head>
-    <title>Simple Game of Life</title>
-    <style type="text/css">
-     td {
-       width:   8px;
-       height:  8px;
-       border:  1px solid #aaa;
-       padding: 0;
-       margin:  0;
-     }
 
-     td.on {
-       background: red;
-     }
+<head>
+  <title>Simple Game of Life</title>
+  <style type="text/css">
+    td {
+      width: 8px;
+      height: 8px;
+      border: 1px solid #aaa;
+      padding: 0;
+      margin: 0;
+    }
 
-     td.off {
-       background: #eee;
-     }
+    td.on {
+      background: red;
+    }
 
-     table {
-       border-collapse: collapse;
-     }
-    </style>
-  </head>
-  <body>
-    <div>Turns:<span id="turns"></span></div>
-    <div id="canvas"></div>
+    td.off {
+      background: #eee;
+    }
 
-    <script>
-     const WIDTH      = 100;
-     const HEIGHT     = 60;
-     const TURN_DELAY = 100; //ms
-     const DATA = `
-10101010111
-10100110100
-10010110110
-10010001000
-`;
+    table {
+      border-collapse: collapse;
+    }
+  </style>
+</head>
 
-     let grid  = init();
-     let turns = 0;
+<body>
+  <div>Generations:<span id="turns"></span></div>
+  <div id="canvas"></div>
+  <button onclick="window.run()">Run</button>
+  <button onclick="window.tick()">Step</button>
+  <button onclick="window.stop()">Stop</button>
+  <button onclick="window.clear()">Clear</button>
+  <select id="preset" name="preset" onchange="window.refresh()"> <!--Supplement an id here instead of using 'name'-->
+    <option value="random" selected>Random</option>
+    <option value="glidercrash">Glider crash</option>
+  </select>
+  <script>
+    const WIDTH = 100;
+    const HEIGHT = 60;
+    const TURN_DELAY = 100; //ms
+    const PRESETS = {
+      glidercrash: `
+010${new Array(WIDTH-5).map(i => 0)}010
+001${new Array(WIDTH-5).map(i => 0)}100
+111${new Array(WIDTH-5).map(i => 0)}111
+`,
+      glider: `
+010
+001
+111
+`
+    }
 
-     setInterval(function () {
-       render();
-       turn(grid);
-       turns++;
-       document.querySelector('#turns').innerText=turns;
-     }, TURN_DELAY);
+    let grid;
+    let turns = 0;
+    let interval = undefined;
+    let running = false;
 
-     function init() {
-       // fill the matrix with space
-       let out = new Array(HEIGHT);
-       for(y=0; y<HEIGHT; y++) {
-	 out[y] = new Array(WIDTH);
-       }
+    if (!grid) {
+      init();
+      loadPreset();
+      render();
+    }
 
-       // initialise with a manual input from the DATA block
-       let init = DATA.split("\n")
-		      .filter(function(o) { return o != ""; })
-		      .map(function(o) { return o.split("").map(function(o) { return parseInt(o); }); })
-       for(y=0; y<init.length; y++) {
-	 for(x=0; x<init[y].length; x++) {
-	   out[y][x] = init[y][x];
-         }
-       }
+    // Clear stage and reload the preset
+    function refresh() {
+      clear();
+      loadPreset();
+      render();
+    }
 
-       let table = document.createElement('table');
-       for(y=0; y<HEIGHT; y++) {
-	 tr           = document.createElement('tr'); // for each y position create a table row
-	 tr.dataset.y = y;
+    // Run the simulation
+    function run() {
+      if (!running) {
+        // Grab hold of fthe timer so it can be destroyed in a stop
+        interval = setInterval(tick, TURN_DELAY);
+      }
+      running = true;
+    }
 
-	 for(x=0; x<WIDTH; x++) {
-	   out[y][x]      = Math.random() >= 0.2 ? 0 : 1; // initialise with some random data. comment if you want to do it by hand
-	   td             = document.createElement('td'); // for each x position create a table data cell
-	   td.dataset.y   = y;
-	   td.dataset.x   = x;
-	   td.onmouseover = function() { out[this.dataset.y][this.dataset.x]=1; };
-	   tr.appendChild(td); // add the cell to the row
-	 }
+    // Step to the next generation
+    function tick() {
+      turn();
+      render();
+    }
 
-	 table.appendChild(tr); // add the row to the table
-       }
+    // Stop the simulation
+    function stop() {
+      clearInterval(interval);
+      running = false;
+    }
 
-       document.querySelector('#canvas').appendChild(table); // add the table to the document canvas div
+    // Clear the stage
+    function clear() {
+      clearGrid();
+      turns = 0;
+      render();
+      updateTurns();
+    }
 
-       return out;
-     }
+    // Reset the grid
+    function clearGrid() {
+      for (y = 0; y < HEIGHT; y++) {
+        for (x = 0; x < WIDTH; x++) {
+          grid[y][x] = 0;
+        }
+      }
+    }
 
-     function render() {
-       // scan all x,y positions in grid and update the table cell classes
-       for (y=0; y<HEIGHT; y++) {
-	 let nl = document.querySelectorAll('td[data-y="'+y+'"]');
-         for (x=0; x<WIDTH; x++) {
-	   nl[x].classList = [ grid[y][x] ? 'on':'off' ];
-         }
-       }
-     }
+    // Update the turns
+    function updateTurns() {
+      document.querySelector('#turns').innerText = turns;
+    }
 
-     function turn() {
-       // copy grid contents into snapshot before we start this turn
-       // because you can't easily updating grid if you're still checking it
-       let snapshot = new Array(HEIGHT);
-       for (y=0; y<HEIGHT; y++) {
-	 snapshot[y] = new Array(WIDTH);
-	 for (x=0; x<WIDTH; x++) {
-	   snapshot[y][x] = grid[y][x];
-	 }
-       }
+    // Load a preset
+    function loadPreset() {
+      let preset = document.getElementById("preset").value;
 
-       // the fundamental Game of Life rules
-       for (y=0; y<HEIGHT; y++) {
-	 for (x=0; x<WIDTH; x++) {
-	   let topedge    = y-1;
-	   let bottomedge = y+1;
-	   let leftedge   = x-1;
-	   let rightedge  = x+1;
+      if (preset == "random") {
+        for (y = 0; y < HEIGHT; y++) {
+          for (x = 0; x < WIDTH; x++) {
+            grid[y][x] = Math.floor(Math.random() * 2);
+          }
+        }
+      } else {
+        let init = PRESETS[preset].split("\n").filter(function (o) {
+          return o != "";
+        }).map(function (o) {
+          return o.split("").map(function (o) {
+            return parseInt(o);
+          });
+        });
+        for (y = 0; y < init.length; y++) {
+          for (x = 0; x < init[y].length; x++) {
+            grid[y][x] = init[y][x];
+          }
+        }
+      } // initialise with a manual input from the DATA block
+    }
 
-           // create a list of all the neighbour position checks we need to do for this x,y cell
-           // then filter them for everything inside the bounds of the grid (>0 and < HEIGHT & WIDTH)
-	   let checks = [
-	     [topedge,    leftedge],
-	     [topedge,    x],
-	     [topedge,    rightedge],
-	     [y,          leftedge],
-	     [y,          rightedge],
-	     [bottomedge, leftedge],
-	     [bottomedge, x],
-	     [bottomedge, rightedge]
-	   ]
-	     .filter(function(o) { return o[0] >= 0 && o[0] < HEIGHT; })  // Y boundary checking
-	     .filter(function(o) { return o[1] >= 0 && o[1] < WIDTH;  }); // X boundary checking
+    // Initialise the stage
+    function init() {
 
-	   // then scan through the checks to perform (on snapshot),
-	   // map the true/false alive/dead values for each of those coordinates
-	   // then filter for those which are alive
-	   // and see if we have the right number of alive neighbours (not too many, not too few)
-	   let alive = checks
-	     .map(function(o) { return snapshot[o[0]][o[1]]; })
-	     .filter(function(o) { return o; })
-	     .length;
+      grid = new Array(HEIGHT);
+      for (y = 0; y < HEIGHT; y++) {
+        grid[y] = new Array(WIDTH);
+      }
+      clearGrid();
+      let table = document.createElement('table');
+      for (y = 0; y < HEIGHT; y++) {
+        tr = document.createElement('tr'); // for each y position create a table row
+        tr.dataset.y = y;
 
-	   // and update the state of the visible grid, based on the snapshot checks
-	   grid[y][x] = (snapshot[y][x] && alive == 2) || alive == 3;
-	 }
-       }
-     }
-    </script>
-  </body>
+        for (x = 0; x < WIDTH; x++) {
+          // out[y][x] = Math.random() >= 0.2 ? 0 : 1; // initialise with some random data. comment if you want to do it by hand
+          td = document.createElement('td'); // for each x position create a table data cell
+          td.dataset.y = y;
+          td.dataset.x = x;
+          td.onmouseover = function (e, i) {
+            let y = e.target.dataset.y;
+            let x = e.target.dataset.x;
+            if (running) {
+              grid[y][x] = 1;
+              e.target.classList = [grid[y][x] ? 'on' : 'off'];
+            }
+          };
+          td.onclick = function (e, i) {
+            let y = e.target.dataset.y;
+            let x = e.target.dataset.x;
+            grid[y][x] = !grid[y][x];
+            e.target.classList = [grid[y][x] ? 'on' : 'off'];
+          };
+          tr.appendChild(td); // add the cell to the row
+        }
+
+        table.appendChild(tr); // add the row to the table
+      }
+
+      document.querySelector('#canvas').appendChild(table); // add the table to the document canvas div
+
+    }
+
+    function render() {
+      // scan all x,y positions in grid and update the table cell classes
+
+      for (y = 0; y < HEIGHT; y++) {
+        let nl = document.querySelectorAll('td[data-y="' + y + '"]');
+        for (x = 0; x < WIDTH; x++) {
+          nl[x].classList = [grid[y][x] ? 'on' : 'off'];
+        }
+      }
+    }
+
+    function turn() {
+      // copy grid contents into snapshot before we start this turn
+      // because you can't easily updating grid if you're still checking it
+      let snapshot = new Array(HEIGHT);
+      for (y = 0; y < HEIGHT; y++) {
+        snapshot[y] = new Array(WIDTH);
+        for (x = 0; x < WIDTH; x++) {
+          snapshot[y][x] = grid[y][x];
+        }
+      }
+
+      // the fundamental Game of Life rules
+      for (y = 0; y < HEIGHT; y++) {
+        for (x = 0; x < WIDTH; x++) {
+          let topedge = y - 1;
+          let bottomedge = y + 1;
+          let leftedge = x - 1;
+          let rightedge = x + 1;
+
+          // create a list of all the neighbour position checks we need to do for this x,y cell
+          // then filter them for everything inside the bounds of the grid (>0 and < HEIGHT & WIDTH)
+          let checks = [
+              [topedge, leftedge],
+              [topedge, x],
+              [topedge, rightedge],
+              [y, leftedge],
+              [y, rightedge],
+              [bottomedge, leftedge],
+              [bottomedge, x],
+              [bottomedge, rightedge]
+            ]
+            .filter(function (o) {
+              return o[0] >= 0 && o[0] < HEIGHT;
+            }) // Y boundary checking
+            .filter(function (o) {
+              return o[1] >= 0 && o[1] < WIDTH;
+            }); // X boundary checking
+
+          // then scan through the checks to perform (on snapshot),
+          // map the true/false alive/dead values for each of those coordinates
+          // then filter for those which are alive
+          // and see if we have the right number of alive neighbours (not too many, not too few)
+          let alive = checks
+            .map(function (o) {
+              return snapshot[o[0]][o[1]];
+            })
+            .filter(function (o) {
+              return o;
+            })
+            .length;
+
+          // and update the state of the visible grid, based on the snapshot checks
+          grid[y][x] = (snapshot[y][x] && alive == 2) || alive == 3;
+        }
+      }
+      turns += 1;
+      updateTurns()
+    }
+  </script>
+
+</body>
+
 </html>
